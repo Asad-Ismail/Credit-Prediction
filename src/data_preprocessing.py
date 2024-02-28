@@ -86,15 +86,46 @@ def split_data(df, label_col, train_data_ratio, test_data_ratio):
 
 
 def get_features_and_labels(train_df, val_df, test_df, output_dir):
+
+    train_df=train_df.copy()
+    val_df=val_df.copy()
+    test_df=test_df.copy()
+
+    logging.info("CRG NA counts in train before imputation are {}".format(train_df['CRG'].isnull().sum()))
+
+    crg_imputer=train_df['CRG'].median()
+    train_df.loc[:, 'CRG'].fillna(crg_imputer, inplace=True)
+    val_df.loc[:, 'CRG'].fillna(crg_imputer, inplace=True)
+    test_df.loc[:, 'CRG'].fillna(crg_imputer, inplace=True)
+
+    logging.info("CRG NA counts in train are {}".format(train_df['CRG'].isnull().sum()))
+
+    X_train= train_df.drop(['client_nr','yearmonth','credit_application','nr_credit_applications'],axis=1)
+    y_train= train_df['credit_application']
+
+    X_val= val_df.drop(['client_nr','yearmonth','credit_application','nr_credit_applications'],axis=1)
+    y_val = val_df['credit_application']
+
+    X_test= test_df.drop(['client_nr','yearmonth','credit_application','nr_credit_applications'],axis=1)
+    y_test= test_df['credit_application']
     #features['TransactionAmt'] = features['TransactionAmt'].apply(np.log10)
     #logging.info("Wrote features to file: {}".format(os.path.join(output_dir, 'features_xgboost.csv')))
-    
-    # Get labels
-    #transactions_df[['TransactionID', 'isFraud']].to_csv(os.path.join(output_dir, 'tags.csv'), index=False)
-    #logging.info("Wrote labels to file: {}".format(os.path.join(output_dir, 'tags.csv')))
-    pass
+
+    X_train.to_csv(os.path.join(output_dir, 'train_features.csv'), index=False)
+    y_train.to_csv(os.path.join(output_dir, 'train_labels.csv'), index=False)
+    logging.info("Wrote training files to: {} ".format(os.path.join(output_dir, 'train_features.csv')))
+
+    X_val.to_csv(os.path.join(output_dir, 'val_features.csv'), index=False)
+    y_val.to_csv(os.path.join(output_dir, 'val_labels.csv'), index=False)
+    logging.info("Wrote validation files to: {} ".format(os.path.join(output_dir, 'val_features.csv')))
+
+
+    X_test.to_csv(os.path.join(output_dir, 'test_features.csv'), index=False)
+    y_test.to_csv(os.path.join(output_dir, 'test_labels.csv'), index=False)
+    logging.info("Wrote Test files to: {} ".format(os.path.join(output_dir, 'test_features.csv')))
 
 if __name__ == '__main__':
+
     logging = get_logger(__name__)
 
     args = parse_args()
@@ -105,5 +136,6 @@ if __name__ == '__main__':
                             args.label_col)
 
     train_df,val_df,test_df = split_data(df, args.label_col, args.train_data_ratio, args.test_data_ratio)
+
     get_features_and_labels(train_df,val_df,test_df, args.output_dir)
 
