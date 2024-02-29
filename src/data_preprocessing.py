@@ -4,6 +4,10 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
 from typing import Tuple
 
 def parse_args() -> argparse.Namespace:
@@ -39,6 +43,104 @@ def get_logger(name: str) -> logging.Logger:
     logging.basicConfig(format=log_format, level=logging.INFO)
     logger.setLevel(logging.INFO)
     return logger
+
+def apply_log_transform(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Applies log transformation to specified numeric columns to reduce skewness.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing the features to transform.
+        
+    Returns:
+        pd.DataFrame: DataFrame with log-transformed features.
+    """
+    numeric_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
+    df[numeric_cols] = df[numeric_cols].apply(lambda x: np.log1p(x))
+    return df
+
+def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.DataFrame, feature_cols: list) -> tuple:
+    """
+    Fits a standard scaler on the training data and applies the transformation to the training, validation, and test datasets.
+    
+    Args:
+        train_df (pd.DataFrame): Training data DataFrame.
+        val_df (pd.DataFrame): Validation data DataFrame.
+        test_df (pd.DataFrame): Testing data DataFrame.
+        feature_cols (list): List of column names to scale.
+        
+    Returns:
+        tuple: Tuple containing the scaled training, validation, and test DataFrames.
+    """
+    scaler = StandardScaler()
+    train_df_scaled = scaler.fit_transform(train_df[feature_cols])
+    val_df_scaled = scaler.transform(val_df[feature_cols])
+    test_df_scaled = scaler.transform(test_df[feature_cols])
+
+    # Update the original dataframes with the scaled values
+    train_df[feature_cols] = train_df_scaled
+    val_df[feature_cols] = val_df_scaled
+    test_df[feature_cols] = test_df_scaled
+
+    return train_df, val_df, test_df
+
+def plot_distributions(df: pd.DataFrame, columns: list, output_dir: str, prefix: str = "") -> None:
+    """
+    Plots the distribution of each specified column in the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing the data.
+        columns (list): List of column names to plot.
+        output_dir (str): Directory to save the plot images.
+        prefix (str): Prefix for the plot file names.
+    """
+    for column in columns:
+        plt.figure(figsize=(10, 6))
+        sns.histplot(df[column], kde=True)
+        plt.title(f"Distribution of {column}")
+        plt.xlabel(column)
+        plt.ylabel("Frequency")
+        plt.savefig(os.path.join(output_dir, f"{prefix}{column}_distribution.png"))
+        plt.close()
+
+def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.DataFrame, output_dir: str, apply_log: bool = False, apply_scaling: bool = False) -> None:
+    """
+    Preprocesses the data by applying log transformation and standard scaling based on flags.
+    Plots the feature distributions before and after transformations.
+    
+    Args:
+        train_df (pd.DataFrame): Training data DataFrame.
+        val_df (pd.DataFrame): Validation data DataFrame.
+        test_df (pd.DataFrame): Testing data DataFrame.
+        output_dir (str): Directory to save processed files and plots.
+        apply_log (bool): Flag to apply log transformation.
+        apply_scaling (bool): Flag to apply standard scaling.
+    """
+    # Ensure output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Plot original distributions
+    plot_distributions(train_df, ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx'], output_dir, "original_")
+    
+    if apply_log:
+        # Apply log transformation
+        train_df = apply_log_transform(train_df)
+        val_df = apply_log_transform(val_df)
+        test_df = apply_log_transform(test_df)
+        # Plot distributions after log transformation
+        plot_distributions(train_df, ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx'], output_dir, "log_")
+    
+    if apply_scaling:
+        # Apply standard scaling
+        feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
+        train_df[feature_cols] = apply_standard_scaling(train_df[feature_cols])
+        val_df[feature_cols] = apply_standard_scaling(val_df[feature_cols])
+        test_df[feature_cols] = apply_standard_scaling(test_df[feature_cols])
+        # Plot distributions after standard scaling
+        plot_distributions(train_df, feature_cols, output_dir, "scaled_")
+    
+    # Continue with saving processed data as demonstrated previously...
+
 
 def load_data(data_dir: str, credit_data: str, features_data: str, label_col: str) -> pd.DataFrame:
     """
