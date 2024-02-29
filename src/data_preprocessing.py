@@ -229,23 +229,34 @@ def split_data_time(df: pd.DataFrame, label_col: str, n: int = 3) -> Tuple[pd.Da
     return train_df, val_df
 
 
-def split_data(df: pd.DataFrame, label_col: str, train_data_ratio: float, val_data_ratio: float, time_split: bool= True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def split_data(df: pd.DataFrame, label_col: str, train_data_ratio: float, val_data_ratio: float, time_based_split: bool) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Splits data into train, validation, and test sets based on specified ratios.
-
+    Splits data into train and validation sets based on specified ratios and method. Logs the label distribution.
+    
     Args:
         df (pd.DataFrame): The DataFrame to split.
         label_col (str): The name of the label column.
         train_data_ratio (float): The ratio of data to use for training.
-        test_data_ratio (float): The ratio of data to use for testing.
-
+        val_data_ratio (float): The ratio of data to use for validation.
+        time_based_split (bool): If True, perform time-based splitting; else, perform stratified splitting.
+        logger (logging.Logger): Logger for logging messages.
+        
     Returns:
-        Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: The train, validation, and test DataFrames.
+        Tuple[pd.DataFrame, pd.DataFrame]: The train and validation DataFrames.
     """
-    if time_split:
-        return split_data_time(df,label_col,n=3)
+    logger.info(f"Original data label distribution:\n{df[label_col].value_counts(normalize=True)}")
+    
+    if time_based_split:
+        # Assuming 'yearmonth' is sorted in ascending order
+         split_data_time(df, label_col, 3)
     else:
-        return split_data_stratified(df,label_col,train_data_ratio,val_data_ratio)
+        train_df, val_df = train_test_split(df, test_size=val_data_ratio, stratify=df[[label_col, 'client_nr']], random_state=42)
+    
+    logging.info(f"Train data label distribution:\n{train_df[label_col].value_counts(normalize=True)}")
+    logging.info(f"Validation data label distribution:\n{val_df[label_col].value_counts(normalize=True)}")
+    
+    return train_df, val_df
+
 
 def save_processed_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: str) -> None:
     """
