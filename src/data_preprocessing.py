@@ -239,7 +239,6 @@ def split_data(df: pd.DataFrame, label_col: str, train_data_ratio: float, val_da
         train_data_ratio (float): The ratio of data to use for training.
         val_data_ratio (float): The ratio of data to use for validation.
         time_based_split (bool): If True, perform time-based splitting; else, perform stratified splitting.
-        logger (logging.Logger): Logger for logging messages.
         
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: The train and validation DataFrames.
@@ -287,6 +286,6 @@ if __name__ == '__main__':
     args = parse_args()
 
     df = load_data(args.data_dir, args.credit_applications, args.user_features, args.label_col)
-    train_df, val_df = split_data_stratified(df, args.label_col, args.train_data_ratio,args.val_data_ratio)
+    train_df, val_df = split_data(df, args.label_col, args.train_data_ratio,args.val_data_ratio,args.time_based_split)
     train_df, val_df = preprocess_data(train_df, val_df, args.output_dir,apply_log=True, apply_scaling=True, apply_imputer=True)
     save_processed_data(train_df, val_df, args.output_dir)
