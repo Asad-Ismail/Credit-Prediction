@@ -59,28 +59,24 @@ def apply_log_transform(df: pd.DataFrame) -> pd.DataFrame:
     df[numeric_cols] = df[numeric_cols].apply(lambda x: np.log1p(x))
     return df
 
-def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, feature_cols: list) -> tuple:
+def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, feature_cols: list) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Fits a standard scaler on the training data and applies the transformation to the training, validation, and test datasets.
+    Fits a standard scaler on the training data and applies the transformation to the training and validation datasets.
     
     Args:
         train_df (pd.DataFrame): Training data DataFrame.
         val_df (pd.DataFrame): Validation data DataFrame.
-        test_df (pd.DataFrame): Testing data DataFrame.
         feature_cols (list): List of column names to scale.
         
     Returns:
-        tuple: Tuple containing the scaled training, validation, and test DataFrames.
+        Tuple[pd.DataFrame, pd.DataFrame]: Tuple containing the scaled training and validation DataFrames.
     """
     scaler = StandardScaler()
-    train_df_scaled = scaler.fit_transform(train_df[feature_cols])
-    val_df_scaled = scaler.transform(val_df[feature_cols])
-
-    # Update the original dataframes with the scaled values
-    train_df[feature_cols] = train_df_scaled
-    val_df[feature_cols] = val_df_scaled
+    train_df[feature_cols] = scaler.fit_transform(train_df[feature_cols])
+    val_df[feature_cols] = scaler.transform(val_df[feature_cols])
 
     return train_df, val_df
+
 
 def plot_distributions(df: pd.DataFrame, columns: list, output_dir: str, prefix: str = "") -> None:
     """
