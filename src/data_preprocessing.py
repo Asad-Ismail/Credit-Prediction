@@ -119,8 +119,11 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.Da
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
+    # Define the feature columns to transform
+    feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
+    
     # Plot original distributions
-    plot_distributions(train_df, ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx'], output_dir, "original_")
+    plot_distributions(train_df, feature_cols, output_dir, "original_")
     
     if apply_log:
         # Apply log transformation
@@ -128,18 +131,14 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.Da
         val_df = apply_log_transform(val_df)
         test_df = apply_log_transform(test_df)
         # Plot distributions after log transformation
-        plot_distributions(train_df, ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx'], output_dir, "log_")
+        plot_distributions(train_df, feature_cols, output_dir, "log_")
     
     if apply_scaling:
-        # Apply standard scaling
-        feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
-        train_df[feature_cols] = apply_standard_scaling(train_df[feature_cols])
-        val_df[feature_cols] = apply_standard_scaling(val_df[feature_cols])
-        test_df[feature_cols] = apply_standard_scaling(test_df[feature_cols])
+        # Apply standard scaling correctly across datasets
+        train_df, val_df, test_df = apply_standard_scaling(train_df, val_df, test_df, feature_cols)
         # Plot distributions after standard scaling
         plot_distributions(train_df, feature_cols, output_dir, "scaled_")
-    
-    # Continue with saving processed data as demonstrated previously...
+
 
 
 def load_data(data_dir: str, credit_data: str, features_data: str, label_col: str) -> pd.DataFrame:
