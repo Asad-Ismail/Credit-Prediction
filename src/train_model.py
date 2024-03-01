@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
     parser.add_argument('--model', type=str, default='xgboost', choices=['xgboost', 'random_forest', 'logistic_regression'], help='Model to train.')    
     parser.add_argument('--hp-optimizer', action='store_true', help='Enable hyperparameter optimization.')            
-    parser.add_argument('--evaluation-metric', type=str, default='roc_auc', choices=['roc_auc', 'f1', 'precision', 'recall'], help='Metric for HP optimization and model selection.')
+    parser.add_argument('--evaluation-metric', type=str, default='roc_auc', choices=['roc_auc', 'f1', 'precision', 'recall','average_precision'], help='Metric for HP optimization and model selection.')
     parser.add_argument('--imbalance-strategy', type=str, default='weighted', choices=['none', 'weighted', 'oversample', 'undersample'], help='Strategy to handle class imbalance.')
     return parser.parse_args()
 
