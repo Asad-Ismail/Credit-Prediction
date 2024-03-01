@@ -19,8 +19,8 @@ def parse_args():
     parser.add_argument('--val-features', type=str, default='processed_data/val_features.csv', help='Path to the training features.')
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
     parser.add_argument('--model', type=str, default='xgboost', choices=['xgboost', 'random_forest', 'logistic_regression'], help='Model to train.')    
-    parser.add_argument('--hp-optimizer', action='store_true', help='Enable hyperparameter optimization.')            
-    parser.add_argument('--evaluation-metric', type=str, default='roc_auc', choices=['roc_auc', 'f1', 'precision', 'recall','average_precision'], help='Metric for HP optimization and model selection.')
+    parser.add_argument('--hp-optimizer', action='store_true', default=True, help='Enable hyperparameter optimization.')            
+    parser.add_argument('--evaluation-metric', type=str, default='average_precision', choices=['roc_auc', 'f1', 'precision', 'recall','average_precision'], help='Metric for HP optimization and model selection.')
     parser.add_argument('--imbalance-strategy', type=str, default='weighted', choices=['none', 'weighted', 'oversample', 'undersample'], help='Strategy to handle class imbalance.')
     return parser.parse_args()
 
@@ -86,18 +86,34 @@ def handle_imbalance(X, y, strategy: str):
     return X_res, y_res
 
 def train_and_optimize_model(X, y, args):
+    
+    scale_pos_weight = ((y == 0).sum() / (y == 1).sum()).values[0] if args.imbalance_strategy == 'weighted' else 1
+
+    class_weights = {0: 1, 1: scale_pos_weight} if args.imbalance_strategy == 'weighted' else None
+
     if args.model == 'xgboost':
-        model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
-        param_grid = {'max_depth': [3, 4, 5], 'n_estimators': [100, 200]} if args.hp_optimizer else {}
+        model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss',scale_pos_weight=class_weights[1])
+        
+        param_grid = {
+        'max_depth': [3, 4, 5],
+        'n_estimators': [100, 200,500,1000],
+        'learning_rate': [0.01, 0.1, 0.2],
+        'subsample': [0.7, 0.8, 1.0],
+        #'colsample_bytree': [0.7, 0.8, 1.0],
+        'gamma': [0, 0.1, 0.2],
+        #'reg_alpha': [0, 0.1, 1],
+        'reg_lambda': [1, 0.1, 0]} if args.hp_optimizer else {}
+
     elif args.model == 'random_forest':
-        model = RandomForestClassifier()
-        param_grid = {'n_estimators': [100, 200], 'max_depth': [None, 10, 20]} if args.hp_optimizer else {}
+        model = RandomForestClassifier(class_weight=class_weights)
+        param_grid = {'n_estimators': [100, 200,500], 'max_depth': [None, 10, 20]} if args.hp_optimizer else {}
+
     elif args.model == 'logistic_regression':
-        model = LogisticRegression(solver='liblinear')
+        model = LogisticRegression(solver='liblinear',class_weight=class_weights)
         param_grid = {'C': [0.1, 1, 10]} if args.hp_optimizer else {}
     
     if args.hp_optimizer:
-        cv = StratifiedKFold(n_splits=5)
+        cv = StratifiedKFold(n_splits=3)
         grid_search = GridSearchCV(model, param_grid, scoring=args.evaluation_metric, cv=cv, verbose=1)
         grid_search.fit(X, y)
         best_model = grid_search.best_estimator_
@@ -114,11 +130,13 @@ def log_results(model, X, y, logger):
     y_pred = (y_pred_proba >= 0.5).astype(int)  # Convert probabilities to binary output
     recall, precision, roc_auc, cm = evaluate_classification(y, y_pred, y_pred_proba)
     logger.info(f"% Recall: {recall * 100} ")
+    logger.info(f"% Precision: {recall * 100} ")
     logger.info(f"% ROC_AUC: {roc_auc * 100 }")
     logger.info(f"CM : \n {cm}")
 
 if __name__ == '__main__':
     args = parse_args()
+
     logger = get_logger(__name__)
     
     X_train, y_train, X_val, y_val = load_data(args.train_features, args.train_labels, args.val_features, args.val_labels)
@@ -127,6 +145,7 @@ if __name__ == '__main__':
     best_model = train_and_optimize_model(X_train_bal, y_train_bal, args)
     
     log_results(best_model, X_val, y_val, logger)
-    save_model(best_model)
+
+    save_model(best_model,args)
 
 

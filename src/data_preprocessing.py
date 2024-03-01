@@ -26,7 +26,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--label-col', type=str, default='credit_application', help='Name of the label column in the data.')
     parser.add_argument('--train-data-ratio', type=float, default=0.9, help='Fraction of data to use for the training set.')
     parser.add_argument('--val-data-ratio', type=float, default=0.1, help='Fraction of data to use for the val set.')
-    parser.add_argument('--time_based_split', type=bool, default=True, help='Use Time based splitting for dataset')
+    parser.add_argument('--time-based-split', type=bool, default=True, help='Use Time based splitting for dataset')
+    parser.add_argument('--apply-log', type=bool, default=False, help='Use Log transformation')
+    parser.add_argument('--apply-scaling', type=bool, default=False, help='Apply standard scaling')
+    parser.add_argument('--apply-imputer', type=bool, default=True, help='Impute values of missing values')
+    parser.add_argument('--add-new-features', type=bool, default=False, help='Create new features')
     return parser.parse_args()
 
 def get_logger(name: str) -> logging.Logger:
@@ -105,7 +109,7 @@ def new_features(train_df,val_df):
         df['credit_to_debit_ratio_count'] = np.where(df['nr_debit_trx'] == 0, 0, df['nr_credit_trx'] /df['nr_debit_trx'])
     return train_df,val_df
 
-def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: str, apply_log: bool = False, apply_scaling: bool = False, apply_imputer: bool = True,add_new_features: bool = True) -> tuple:
+def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: str,args:argparse.Namespace) -> tuple:
     """
     Preprocesses the data by applying log transformation and standard scaling based on flags.
     Plots the feature distributions before and after transformations.
@@ -129,7 +133,7 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
     # Plot original distributions
     plot_distributions(train_df, feature_cols, output_dir, "original_")
     
-    if apply_log:
+    if args.apply_log:
         logging.info(f"Applying log transformation!")
         # Apply log transformation
         train_df = apply_log_transform(train_df)
@@ -137,21 +141,21 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
         # Plot distributions after log transformation
         plot_distributions(train_df, feature_cols, output_dir, "log_")
     
-    if apply_scaling:
+    if args.apply_scaling:
         logging.info(f"Applying Scaling transformation!")
         # Apply standard scaling correctly across datasets
         train_df, val_df= apply_standard_scaling(train_df, val_df, feature_cols)
         # Plot distributions after standard scaling
         plot_distributions(train_df, feature_cols, output_dir, "scaled_")
     
-    if apply_imputer:
+    if args.apply_imputer:
         logging.info(f"Applying Imptations!")
         # Impute missing 'CRG' values with the median
         crg_imputer = train_df['CRG'].median()
         for df in [train_df, val_df]:
             df['CRG'].fillna(crg_imputer, inplace=True)
 
-    if add_new_features:
+    if args.add_new_features:
         logging.info(f"Adding new features!")
         # Additional Feature Engineering
         train_df,val_df=new_features(train_df, val_df)
@@ -290,10 +294,11 @@ def save_processed_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir
         logging.info(f"Wrote {file_name} to {os.path.join(output_dir, file_name)}")
 
 if __name__ == '__main__':
+
     logger = get_logger(__name__)
     args = parse_args()
 
     df = load_data(args.data_dir, args.credit_applications, args.user_features, args.label_col)
     train_df, val_df = split_data(df, args.label_col, args.train_data_ratio,args.val_data_ratio,args.time_based_split)
-    train_df, val_df = preprocess_data(train_df, val_df, args.output_dir,apply_log=False, apply_scaling=False, apply_imputer=True,add_new_features=True)
+    train_df, val_df = preprocess_data(train_df, val_df, args.output_dir,args)
     save_processed_data(train_df, val_df, args.output_dir)
