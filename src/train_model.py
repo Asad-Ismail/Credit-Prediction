@@ -22,6 +22,12 @@ def get_logger(name: str) -> logging.Logger:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     return logger
 
+def save_model(model):
+    import joblib
+    model_save_path = 'xgb_model.pkl'
+    joblib.dump(model, model_save_path)
+    logger.info(f"Model saved to {model_save_path}")
+
 
 def evaluate_classification(y_true, y_pred, y_pred_proba):
     # Calculate recall
@@ -106,3 +112,6 @@ if __name__ == '__main__':
     
     # Log results
     log_results(model, X_val, y_val, logger)
+
+    save_model(model)
+
