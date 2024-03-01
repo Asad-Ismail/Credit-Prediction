@@ -97,7 +97,15 @@ def plot_distributions(df: pd.DataFrame, columns: list, output_dir: str, prefix:
         plt.savefig(os.path.join(output_dir, f"{prefix}{column}_distribution.png"))
         plt.close()
 
-def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: str, apply_log: bool = False, apply_scaling: bool = False, apply_imputer: bool = True) -> tuple:
+
+def new_features(train_df,val_df):
+    for df in [train_df,val_df]:
+        df['balance_range'] = df['max_balance'] - df['min_balance']
+        df['credit_to_debit_ratio_volume'] = np.where(df['volume_debit_trx'] == 0, 0, df['volume_credit_trx'] / df['volume_debit_trx'])
+        df['credit_to_debit_ratio_count'] = np.where(df['nr_debit_trx'] == 0, 0, df['nr_credit_trx'] /df['nr_debit_trx'])
+    return train_df,val_df
+
+def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: str, apply_log: bool = False, apply_scaling: bool = False, apply_imputer: bool = True,add_new_features: bool = True) -> tuple:
     """
     Preprocesses the data by applying log transformation and standard scaling based on flags.
     Plots the feature distributions before and after transformations.
@@ -122,6 +130,7 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
     plot_distributions(train_df, feature_cols, output_dir, "original_")
     
     if apply_log:
+        logging.info(f"Applying log transformation!")
         # Apply log transformation
         train_df = apply_log_transform(train_df)
         val_df = apply_log_transform(val_df)
@@ -129,16 +138,23 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
         plot_distributions(train_df, feature_cols, output_dir, "log_")
     
     if apply_scaling:
+        logging.info(f"Applying Scaling transformation!")
         # Apply standard scaling correctly across datasets
         train_df, val_df= apply_standard_scaling(train_df, val_df, feature_cols)
         # Plot distributions after standard scaling
         plot_distributions(train_df, feature_cols, output_dir, "scaled_")
     
     if apply_imputer:
+        logging.info(f"Applying Imptations!")
         # Impute missing 'CRG' values with the median
         crg_imputer = train_df['CRG'].median()
         for df in [train_df, val_df]:
             df['CRG'].fillna(crg_imputer, inplace=True)
+
+    if add_new_features:
+        logging.info(f"Adding new features!")
+        # Additional Feature Engineering
+        train_df,val_df=new_features(train_df, val_df)
 
     return  train_df,val_df
 
@@ -184,7 +200,6 @@ def split_data_stratified(df: pd.DataFrame, label_col: str, train_data_ratio: fl
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: The train, validation, and test DataFrames.
     """
-    logging.info(f"Data split ratios - Train: {train_data_ratio}, Validation: {val_data_ratio}")
 
     # Stratified sampling based on 'client_nr' and 'credit_application'
     client_label_dist = df.groupby('client_nr')[label_col].mean().reset_index()
@@ -195,9 +210,6 @@ def split_data_stratified(df: pd.DataFrame, label_col: str, train_data_ratio: fl
 
     train_df = df[df['client_nr'].isin(client_train['client_nr'])]
     val_df = df[df['client_nr'].isin(client_val['client_nr'])]
-
-    logging.info(f"Data percentages - Train: {len(train_df) / len(df) * 100:.2f}%, Validation: {len(val_df) / len(df) * 100:.2f}%")
-    logging.info(f"Credit application percentages - Train: {train_df[label_col].mean() * 100:.2f}%, Validation: {val_df[label_col].mean() * 100:.2f}%")
 
     return train_df, val_df
 
@@ -214,17 +226,13 @@ def split_data_time(df: pd.DataFrame, label_col: str, n: int = 3) -> Tuple[pd.Da
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: The train, validation, and test DataFrames.
     """
-    logging.info(f"Data split ratios - Train: {train_data_ratio}, Validation: {val_data_ratio}")
 
     df_sorted= df.sort_values(by=['client_nr', 'yearmonth'], ascending=[True, True])
     # Get the last entry for each 'client_nr' as the test set
     val_df = df_sorted.groupby('client_nr').tail(n)
     
     # Use the remaining data as the training set
-    train_df = df_sorted.drop(test_df.index)
-
-    logging.info(f"Data percentages - Train: {len(train_df) / len(df) * 100:.2f}%, Validation: {len(val_df) / len(df) * 100:.2f}%")
-    logging.info(f"Credit application percentages - Train: {train_df[label_col].mean() * 100:.2f}%, Validation: {val_df[label_col].mean() * 100:.2f}%")
+    train_df = df_sorted.drop(val_df.index)
 
     return train_df, val_df
 
@@ -247,7 +255,7 @@ def split_data(df: pd.DataFrame, label_col: str, train_data_ratio: float, val_da
     
     if time_based_split:
         # Assuming 'yearmonth' is sorted in ascending order
-         split_data_time(df, label_col, 3)
+        train_df,val_df = split_data_time(df, label_col, 3)
     else:
         train_df, val_df = train_test_split(df, test_size=val_data_ratio, stratify=df[[label_col, 'client_nr']], random_state=42)
     
@@ -287,5 +295,5 @@ if __name__ == '__main__':
 
     df = load_data(args.data_dir, args.credit_applications, args.user_features, args.label_col)
     train_df, val_df = split_data(df, args.label_col, args.train_data_ratio,args.val_data_ratio,args.time_based_split)
-    train_df, val_df = preprocess_data(train_df, val_df, args.output_dir,apply_log=True, apply_scaling=True, apply_imputer=True)
+    train_df, val_df = preprocess_data(train_df, val_df, args.output_dir,apply_log=False, apply_scaling=False, apply_imputer=True,add_new_features=True)
     save_processed_data(train_df, val_df, args.output_dir)
