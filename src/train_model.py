@@ -1,5 +1,8 @@
 import pandas as pd
 import xgboost as xgb
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
@@ -7,6 +10,7 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import recall_score, precision_score, roc_auc_score, confusion_matrix, roc_curve
 import logging
 import argparse
+import joblib
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a model on processed data.")
@@ -14,6 +18,9 @@ def parse_args():
     parser.add_argument('--train-labels', type=str, default='processed_data/train_labels.csv', help='Path to the training labels.')
     parser.add_argument('--val-features', type=str, default='processed_data/val_features.csv', help='Path to the training features.')
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
+    parser.add_argument('--model', type=str, default='xgboost', choices=['xgboost', 'random_forest', 'logistic_regression'], help='Model to train.')    
+    parser.add_argument('--hp-optimizer', action='store_true', help='Enable hyperparameter optimization.')            
+    parser.add_argument('--evaluation-metric', type=str, default='roc_auc', choices=['roc_auc', 'f1', 'precision', 'recall'], help='Metric for HP optimization and model selection.')
     parser.add_argument('--imbalance-strategy', type=str, default='weighted', choices=['none', 'weighted', 'oversample', 'undersample'], help='Strategy to handle class imbalance.')
     return parser.parse_args()
 
@@ -22,12 +29,10 @@ def get_logger(name: str) -> logging.Logger:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     return logger
 
-def save_model(model):
-    import joblib
-    model_save_path = 'xgb_model.pkl'
-    joblib.dump(model, model_save_path)
-    logger.info(f"Model saved to {model_save_path}")
-
+def save_model(model, args):
+    model_name = args.model + ('_hp_optimized' if args.hp_optimizer else '') + '.pkl'
+    joblib.dump(model, model_name)
+    logger.info(f"Model saved to {model_name}")
 
 def evaluate_classification(y_true, y_pred, y_pred_proba):
     # Calculate recall
@@ -80,14 +85,29 @@ def handle_imbalance(X, y, strategy: str):
         X_res, y_res = X, y
     return X_res, y_res
 
-def train_model(X, y, strategy: str):
-    # Calculate scale_pos_weight for imbalanced dataset
-    scale_pos_weight = ((y == 0).sum() / (y == 1).sum()).values[0] if strategy == 'weighted' else 1
+def train_and_optimize_model(X, y, args):
+    if args.model == 'xgboost':
+        model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+        param_grid = {'max_depth': [3, 4, 5], 'n_estimators': [100, 200]} if args.hp_optimizer else {}
+    elif args.model == 'random_forest':
+        model = RandomForestClassifier()
+        param_grid = {'n_estimators': [100, 200], 'max_depth': [None, 10, 20]} if args.hp_optimizer else {}
+    elif args.model == 'logistic_regression':
+        model = LogisticRegression(solver='liblinear')
+        param_grid = {'C': [0.1, 1, 10]} if args.hp_optimizer else {}
     
-    model = xgb.XGBClassifier(scale_pos_weight=scale_pos_weight, use_label_encoder=False, eval_metric='logloss')
-    model.fit(X, y.values.ravel())
+    if args.hp_optimizer:
+        cv = StratifiedKFold(n_splits=5)
+        grid_search = GridSearchCV(model, param_grid, scoring=args.evaluation_metric, cv=cv, verbose=1)
+        grid_search.fit(X, y)
+        best_model = grid_search.best_estimator_
+        logger.info(f"Best parameters: {grid_search.best_params_}")
+        logger.info(f"Best {args.evaluation_metric} score: {grid_search.best_score_}")
+    else:
+        best_model = model
+        best_model.fit(X, y)
     
-    return model
+    return best_model
 
 def log_results(model, X, y, logger):
     y_pred_proba = model.predict(X)
@@ -101,17 +121,12 @@ if __name__ == '__main__':
     args = parse_args()
     logger = get_logger(__name__)
     
-    # Load data
     X_train, y_train, X_val, y_val = load_data(args.train_features, args.train_labels, args.val_features, args.val_labels)
-    
-    # Handle class imbalance
     X_train_bal, y_train_bal = handle_imbalance(X_train, y_train, args.imbalance_strategy)
     
-    # Train model
-    model = train_model(X_train_bal, y_train_bal, args.imbalance_strategy)
+    best_model = train_and_optimize_model(X_train_bal, y_train_bal, args)
     
-    # Log results
-    log_results(model, X_val, y_val, logger)
+    log_results(best_model, X_val, y_val, logger)
+    save_model(best_model)
 
-    save_model(model)
 
