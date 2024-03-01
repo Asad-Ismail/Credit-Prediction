@@ -257,7 +257,7 @@ def split_data(df: pd.DataFrame, label_col: str, train_data_ratio: float, val_da
         # Assuming 'yearmonth' is sorted in ascending order
         train_df,val_df = split_data_time(df, label_col, 3)
     else:
-        train_df, val_df = train_test_split(df, test_size=val_data_ratio, stratify=df[[label_col, 'client_nr']], random_state=42)
+        train_df, val_df = train_test_split(df, test_size=val_data_ratio, stratify=df[label_col], random_state=42)
     
     logging.info(f"Train data label distribution:\n{train_df[label_col].value_counts(normalize=True)}")
     logging.info(f"Validation data label distribution:\n{val_df[label_col].value_counts(normalize=True)}")
