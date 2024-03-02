@@ -25,7 +25,8 @@ def parse_args():
     Namespace: The parsed command-line arguments.
     """
     parser = argparse.ArgumentParser(description="Model Serving")
-    parser.add_argument('--model-path', type=str, default='xgboost_hp_optimized.pkl', help='Path to the trained model.')
+    parser.add_argument('--model-path', type=str, default='xgboost.pkl', help='Path to the trained model.')
+    parser.add_argument('--debug', type=bool, default=False, help='Debug the falsk app.')
     return parser.parse_args()
 
 # Parse command-line arguments

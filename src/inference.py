@@ -6,18 +6,76 @@ import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
 import xgboost
+from tqdm import tqdm 
 from sklearn.metrics import (recall_score, precision_score, roc_auc_score,
-                             confusion_matrix, roc_curve, precision_recall_curve,
+                             confusion_matrix, roc_curve, precision_recall_curve, auc,
                              average_precision_score)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Model Inference.")
-    parser.add_argument('--model-name', type=str, default='xgboost', help='Name of trained model.')
+    parser.add_argument('--model-name', type=str, default='logistic_regression', help='Name of trained model.')
     parser.add_argument('--model-path', type=str, default='logistic_regression_hp_optimized.pkl', help='Path to the trained Model.')
     parser.add_argument('--val-features', type=str, default='processed_data/val_features.csv', help='Path to the training features.')
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
     return parser.parse_args()
+
+
+def calculate_cost(y_true: np.ndarray, y_pred: np.ndarray, cost_fn: int, cost_fp: int) -> int:
+    """
+    Calculate the cost associated with the predictions given true labels.
+    
+    Parameters:
+    y_true (np.ndarray): The true binary labels.
+    y_pred (np.ndarray): The binary predictions.
+    cost_fn (int): The cost of a false negative.
+    cost_fp (int): The cost of a false positive.
+    
+    Returns:
+    int: The total cost calculated based on the confusion matrix.
+    """
+    # Extract confusion matrix components
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    
+    # Calculate total cost based on provided cost of false negatives and false positives
+    cost = cost_fn * fn + cost_fp * fp  # True negatives and true positives have no cost
+    return cost
+
+def find_optimal_threshold(y_true: np.ndarray, predictions: np.ndarray, cost_fn: int, cost_fp: int) -> (float, int):
+    """
+    Find the optimal threshold that minimizes the cost function.
+
+    Parameters:
+    y_true (np.ndarray): The true binary labels.
+    predictions (np.ndarray): The predicted probabilities for the positive class.
+    cost_fn (int): The cost of a false negative.
+    cost_fp (int): The cost of a false positive.
+
+    Returns:
+    tuple: A tuple containing the optimal threshold and the minimum cost.
+    """
+    # Initialize variables to store the optimal threshold and the minimum cost
+    optimal_threshold = None
+    min_cost = float('inf')
+    
+    # Generate a range of possible thresholds
+    thresholds = np.linspace(0, 1, 1000)
+    
+    # Iterate over all thresholds to find the optimal one
+    for threshold in tqdm(thresholds):
+        # Convert predicted probabilities to binary labels based on the current threshold
+        predicted_labels = (predictions >= threshold).astype(int)
+        
+        # Calculate cost for this threshold
+        cost = calculate_cost(y_true, predicted_labels, cost_fn, cost_fp)
+        
+        # Update the optimal threshold if the current cost is lower than the minimum cost found so far
+        if cost < min_cost:
+            min_cost = cost
+            optimal_threshold = threshold
+    
+    return optimal_threshold, min_cost
+
 
 def evaluate(y_true, y_pred, y_pred_proba,model_name):
     """
@@ -41,7 +99,7 @@ def evaluate(y_true, y_pred, y_pred_proba,model_name):
     # Plot ROC curve
     fpr, tpr, _ = roc_curve(y_true, y_pred_proba)
     plt.figure()
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.3f})')
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -53,10 +111,11 @@ def evaluate(y_true, y_pred, y_pred_proba,model_name):
     plt.close()
 
     # Plot PR curve
-    precision_vals, recall_vals, _ = precision_recall_curve(y_true, y_pred_proba)
-    average_precision = average_precision_score(y_true, y_pred_proba)
+    
+    precision, recall, _ = precision_recall_curve(y_true, y_pred_proba)
+    auc_score = auc(recall, precision)
     plt.figure()
-    plt.plot(recall_vals, precision_vals, color='blue', lw=2, label=f'PR curve (AP = {average_precision:.2f})')
+    plt.plot(recall, precision, color='blue', lw=2, label=f'PR curve (area = {auc_score:.3f})')
     plt.xlabel('Recall')
     plt.ylabel('Precision')
     plt.title('Precision-Recall Curve')
@@ -133,7 +192,8 @@ def explain_model_predictions(model: Any, X_val: pd.DataFrame, output_image_path
     """
     # Determine the model type and create an appropriate explainer
     model_name = type(model).__name__.lower()
-    if 'xgb' in model_name or 'lgbm' in model_name or 'catboost' in model_name or 'randomforest' in model_name:
+    if 'xgb' in model_name or 'randomforest' in model_name:
+        print(f"Running Tree based explainer!")
         explainer = shap.TreeExplainer(model)
     elif 'logistic' in model_name:
         explainer = shap.LinearExplainer(model, X_val, feature_dependence="independent")
@@ -143,7 +203,6 @@ def explain_model_predictions(model: Any, X_val: pd.DataFrame, output_image_path
     # Compute SHAP values
     shap_values = explainer.shap_values(X_val)
 
-    # Plot SHAP values
     # For models that produce a list (multi-class), select the SHAP values for the class of interest
     if isinstance(shap_values, list):
         # Assuming binary classification, index 1 represents the positive class
@@ -169,6 +228,10 @@ if __name__ == "__main__":
 
     ## Evaluate Model
     evaluate(y_val, pred, proba,args.model_name)
+
+    ## Find Optimal threshold
+    optimal_threshold, min_cost = find_optimal_threshold(labels, predictions, cost_fn=500, cost_fp=100)
+    print(f"Optimal Threshold: {optimal_threshold}, Minimum Cost: {min_cost}")
     
     # Explain model predictions and save the plot as an image
     explain_model_predictions(model, X_val, output_image_path=f'figs/{args.model_name}_shap_summary_plot.png')

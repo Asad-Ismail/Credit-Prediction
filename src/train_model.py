@@ -7,7 +7,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
-from sklearn.metrics import recall_score, precision_score, roc_auc_score, confusion_matrix, roc_curve
+from sklearn.metrics import f1_score, recall_score, precision_score, roc_auc_score, confusion_matrix, roc_curve
 import logging
 import argparse
 import joblib
@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument('--val-features', type=str, default='processed_data/val_features.csv', help='Path to the training features.')
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
     parser.add_argument('--model', type=str, default='logistic_regression', choices=['xgboost', 'random_forest', 'logistic_regression'], help='Model to train.')    
-    parser.add_argument('--hp-optimizer', action='store_true', default=True, help='Enable hyperparameter optimization.')            
+    parser.add_argument('--hp-optimizer', action='store_true', default=False, help='Enable hyperparameter optimization.')            
     parser.add_argument('--evaluation-metric', type=str, default='average_precision', choices=['roc_auc', 'f1', 'precision', 'recall','average_precision'], help='Metric for HP optimization and model selection.')
     parser.add_argument('--imbalance-strategy', type=str, default='weighted', choices=['none', 'weighted', 'oversample', 'undersample'], help='Strategy to handle class imbalance.')
     return parser.parse_args()
@@ -44,8 +44,9 @@ def evaluate(y_true, y_pred, y_pred_proba):
     
     cm = confusion_matrix(y_true, y_pred)
     fpr, tpr, _ = roc_curve(y_true, y_pred_proba)
+    f1 = f1_score(y_true, y_pred)  
     
-    return recall, precision, roc_auc, cm
+    return recall, precision, roc_auc, cm, f1
 
 def load_data(train_features_path: str, train_labels_path: str, val_features_path: str, val_labels_path: str) -> pd.DataFrame:
     X_train = pd.read_csv(train_features_path)
@@ -80,16 +81,16 @@ def train_and_optimize_model(X, y, args):
         model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss',scale_pos_weight=class_weights[1])        
         param_grid = {
         'max_depth': [3, 4, 5],
-        'n_estimators': [100, 200,500,1000],
+        'n_estimators': [200,500,700],
         'learning_rate': [0.01, 0.1, 0.2],
-        'subsample': [0.7, 0.8, 1.0],
+        'subsample': [0.7,0.8,0.9, 1.0],
         'gamma': [0, 0.1, 0.2],
         'reg_lambda': [1, 0.1, 0]} if args.hp_optimizer else {}
 
     elif args.model == 'random_forest':
         model = RandomForestClassifier(class_weight=class_weights)
         param_grid = {
-        'n_estimators': [100, 200, 500],
+        'n_estimators': [200, 500,700],
         'max_depth': [None, 10, 20],
         'min_samples_split': [2, 5, 10],
         'min_samples_leaf': [1, 2, 5,10]} if args.hp_optimizer else {}
@@ -116,9 +117,10 @@ def log_results(model, X, y, logger):
     #y_pred_proba = model.predict(X)
     y_pred_proba = model.predict_proba(X)[:, 1]
     y_pred = (y_pred_proba >= 0.5).astype(int) 
-    recall, precision, roc_auc, cm = evaluate(y, y_pred, y_pred_proba)
+    recall, precision, roc_auc, cm, f1 = evaluate(y, y_pred, y_pred_proba)
     logger.info(f"% Recall: {recall * 100} ")
-    logger.info(f"% Precision: {recall * 100} ")
+    logger.info(f"% Precision: {precision * 100} ")
+    logger.info(f"% F1 score: {f1 * 100} ")
     logger.info(f"% ROC_AUC: {roc_auc * 100 }")
     logger.info(f"CM : \n {cm}")
 

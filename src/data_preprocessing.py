@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--val-data-ratio', type=float, default=0.1, help='Fraction of data to use for the val set.')
     parser.add_argument('--time-based-split', type=bool, default=True, help='Use Time based splitting for dataset')
     parser.add_argument('--apply-log', type=bool, default=True, help='Use Log transformation')
-    parser.add_argument('--apply-scaling', type=bool, default=True, help='Apply standard scaling')
+    parser.add_argument('--apply-scaling', type=bool, default=False, help='Apply standard scaling')
     parser.add_argument('--apply-imputer', type=bool, default=True, help='Impute values of missing values')
     parser.add_argument('--add-new-features', type=bool, default=False, help='Create new features')
     return parser.parse_args()
@@ -179,7 +179,8 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
         # Impute missing 'CRG' values with the median
         crg_imputer = train_df['CRG'].median()
         for df in [train_df, val_df]:
-            df['CRG'].fillna(crg_imputer, inplace=True)
+            #df['CRG'].fillna(crg_imputer, inplace=True)
+            df['CRG'].fillna(1, inplace=True)
 
     if args.add_new_features:
         logging.info(f"Adding new features!")
