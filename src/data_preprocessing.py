@@ -27,8 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--train-data-ratio', type=float, default=0.9, help='Fraction of data to use for the training set.')
     parser.add_argument('--val-data-ratio', type=float, default=0.1, help='Fraction of data to use for the val set.')
     parser.add_argument('--time-based-split', type=bool, default=True, help='Use Time based splitting for dataset')
-    parser.add_argument('--apply-log', type=bool, default=False, help='Use Log transformation')
-    parser.add_argument('--apply-scaling', type=bool, default=False, help='Apply standard scaling')
+    parser.add_argument('--apply-log', type=bool, default=True, help='Use Log transformation')
+    parser.add_argument('--apply-scaling', type=bool, default=True, help='Apply standard scaling')
     parser.add_argument('--apply-imputer', type=bool, default=True, help='Impute values of missing values')
     parser.add_argument('--add-new-features', type=bool, default=False, help='Create new features')
     return parser.parse_args()
@@ -49,7 +49,7 @@ def get_logger(name: str) -> logging.Logger:
     logger.setLevel(logging.INFO)
     return logger
 
-def apply_log_transform(df: pd.DataFrame) -> pd.DataFrame:
+def apply_log_transform(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     """
     Applies log transformation to specified numeric columns to reduce skewness.
     
@@ -59,8 +59,7 @@ def apply_log_transform(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: DataFrame with log-transformed features.
     """
-    numeric_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
-    df[numeric_cols] = df[numeric_cols].apply(lambda x: np.log1p(x))
+    df[features_cols] = df[features_cols].apply(lambda x: np.log1p(x))
     return df
 
 def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, feature_cols: list) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -128,10 +127,10 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
         os.makedirs(output_dir)
     
     # Define the feature columns to transform
-    feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
+    feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx', 'max_balance', 'min_balance']
     
     # Plot original distributions
-    plot_distributions(train_df, feature_cols, output_dir, "original_")
+    plot_distributions(train_df, feature_cols+['CRG'], output_dir, "original_")
     
     if args.apply_log:
         logging.info(f"Applying log transformation!")
