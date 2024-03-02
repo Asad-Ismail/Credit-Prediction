@@ -123,29 +123,39 @@ def predict(model: Any, X_val: pd.DataFrame) -> pd.Series:
 def explain_model_predictions(model: Any, X_val: pd.DataFrame, output_image_path: str) -> None:
     """
     Compute and plot SHAP values for the validation set to explain the model's predictions.
-    Save the plot as an image.
-
+    The function automatically handles tree-based models (like XGBoost, Random Forest)
+    and linear models (like Logistic Regression) from sklearn.
+    
     Parameters:
     model (Any): The trained model.
     X_val (pd.DataFrame): The validation features.
     output_image_path (str): The file path to save the SHAP values plot image.
     """
-
-    # Use TreeExplainer for tree-based models and KernelExplainer for others
-    if hasattr(model, 'tree_') or isinstance(model, xgboost.XGBModel):
+    # Determine the model type and create an appropriate explainer
+    model_name = type(model).__name__.lower()
+    if 'xgb' in model_name or 'lgbm' in model_name or 'catboost' in model_name or 'randomforest' in model_name:
         explainer = shap.TreeExplainer(model)
+    elif 'logistic' in model_name:
+        explainer = shap.LinearExplainer(model, X_val, feature_dependence="independent")
     else:
-        explainer = shap.KernelExplainer(model.predict_proba, shap.kmeans(X_val, 10))
-
+        raise ValueError(f"Unsupported model type: {model_name}")
+    
+    # Compute SHAP values
     shap_values = explainer.shap_values(X_val)
-    
-    # For non-tree models, KernelExplainer returns a list for binary classification
+
+    # Plot SHAP values
+    # For models that produce a list (multi-class), select the SHAP values for the class of interest
     if isinstance(shap_values, list):
-        shap_values = shap_values  # Use the SHAP values for the positive class
-    
-    shap.summary_plot(shap_values, X_val, plot_type="bar", show=False)
+        # Assuming binary classification, index 1 represents the positive class
+        shap_values_pos_class = shap_values[1]
+    else:
+        shap_values_pos_class = shap_values
+
+    # The default summary plot shows the impact direction on the model's output
+    shap.summary_plot(shap_values_pos_class, X_val, show=False)
     plt.savefig(output_image_path, bbox_inches='tight')
     plt.close()
+
 
 if __name__ == "__main__":
     args=parse_args()
