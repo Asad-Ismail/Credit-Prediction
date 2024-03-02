@@ -81,24 +81,38 @@ def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, feature
     return train_df, val_df
 
 
-def plot_distributions(df: pd.DataFrame, columns: list, output_dir: str, prefix: str = "") -> None:
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def plot_distributions_together(df: pd.DataFrame, columns: list, output_dir: str, prefix: str = "", rows: int = 1) -> None:
     """
-    Plots the distribution of each specified column in the DataFrame.
+    Plots the distributions of specified columns in the DataFrame on the same figure.
     
     Args:
         df (pd.DataFrame): DataFrame containing the data.
         columns (list): List of column names to plot.
-        output_dir (str): Directory to save the plot images.
-        prefix (str): Prefix for the plot file names.
+        output_dir (str): Directory to save the plot image.
+        prefix (str): Prefix for the plot file name.
+        rows (int): Number of rows in the subplot grid. Columns in the grid will be calculated based on this.
     """
-    for column in columns:
-        plt.figure(figsize=(10, 6))
+    # Calculate the number of columns in the grid based on the number of plots
+    cols = len(columns) // rows + (len(columns) % rows > 0)
+    
+    # Determine the figure size: each subplot has a fixed width and height
+    plt.figure(figsize=(10 * cols, 6 * rows))
+    
+    for i, column in enumerate(columns, 1):
+        plt.subplot(rows, cols, i)
         sns.histplot(df[column], kde=True)
         plt.title(f"Distribution of {column}")
         plt.xlabel(column)
         plt.ylabel("Frequency")
-        plt.savefig(os.path.join(output_dir, f"{prefix}{column}_distribution.png"))
-        plt.close()
+    
+    # Save the entire figure
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, f"{prefix}all_distributions.png"))
+    plt.close()
+
 
 
 def new_features(train_df,val_df):
