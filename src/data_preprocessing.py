@@ -49,6 +49,22 @@ def get_logger(name: str) -> logging.Logger:
     logger.setLevel(logging.INFO)
     return logger
 
+def log_center_transform(x: float) -> float:
+    """
+    Apply a log-centering transformation to a value.
+    
+    This transformation takes the natural logarithm of the absolute value of the input
+    and then restores the sign. It is designed to handle both positive and negative values.
+    
+    Parameters:
+    x (float): The value to transform.
+    
+    Returns:
+    float: The transformed value.
+    """
+    return np.sign(x) * np.log1p(np.abs(x))
+
+
 def apply_log_transform(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     """
     Applies log transformation to specified numeric columns to reduce skewness.
@@ -59,7 +75,7 @@ def apply_log_transform(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     Returns:
         pd.DataFrame: DataFrame with log-transformed features.
     """
-    df[features_cols] = df[features_cols].apply(lambda x: np.log1p(x))
+    df[feature_cols] = df[feature_cols].apply(lambda x: log_center_transform(x))
     return df
 
 def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, feature_cols: list) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -81,10 +97,7 @@ def apply_standard_scaling(train_df: pd.DataFrame, val_df: pd.DataFrame, feature
     return train_df, val_df
 
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-def plot_distributions_together(df: pd.DataFrame, columns: list, output_dir: str, prefix: str = "", rows: int = 1) -> None:
+def plot_distributions(df: pd.DataFrame, columns: list, output_dir: str, prefix: str = "", rows: int = 3) -> None:
     """
     Plots the distributions of specified columns in the DataFrame on the same figure.
     
@@ -149,8 +162,8 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
     if args.apply_log:
         logging.info(f"Applying log transformation!")
         # Apply log transformation
-        train_df = apply_log_transform(train_df)
-        val_df = apply_log_transform(val_df)
+        train_df = apply_log_transform(train_df,feature_cols=feature_cols)
+        val_df = apply_log_transform(val_df,feature_cols=feature_cols)
         # Plot distributions after log transformation
         plot_distributions(train_df, feature_cols, output_dir, "log_")
     
@@ -292,11 +305,9 @@ def save_processed_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir
         test_df (pd.DataFrame): Testing data DataFrame.
         output_dir (str): Directory to save the processed files.
     """
-
     # Split features and labels
     X_train, y_train = train_df.drop(['client_nr', 'yearmonth', 'credit_application', 'nr_credit_applications'], axis=1), train_df['credit_application']
     X_val, y_val = val_df.drop(['client_nr', 'yearmonth', 'credit_application', 'nr_credit_applications'], axis=1), val_df['credit_application']
-
     # Save to CSV
     file_paths = {
         'train_features.csv': X_train, 'train_labels.csv': y_train,

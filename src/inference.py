@@ -5,6 +5,7 @@ import shap
 import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
+import xgboost
 from sklearn.metrics import (recall_score, precision_score, roc_auc_score,
                              confusion_matrix, roc_curve, precision_recall_curve,
                              average_precision_score)
@@ -13,7 +14,7 @@ from sklearn.metrics import (recall_score, precision_score, roc_auc_score,
 def parse_args():
     parser = argparse.ArgumentParser(description="Model Inference.")
     parser.add_argument('--model-name', type=str, default='xgboost', help='Name of trained model.')
-    parser.add_argument('--model-path', type=str, default='xgboost_hp_optimized.pkl', help='Path to the trained Model.')
+    parser.add_argument('--model-path', type=str, default='logistic_regression_hp_optimized.pkl', help='Path to the trained Model.')
     parser.add_argument('--val-features', type=str, default='processed_data/val_features.csv', help='Path to the training features.')
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
     return parser.parse_args()
@@ -129,9 +130,19 @@ def explain_model_predictions(model: Any, X_val: pd.DataFrame, output_image_path
     X_val (pd.DataFrame): The validation features.
     output_image_path (str): The file path to save the SHAP values plot image.
     """
-    explainer = shap.Explainer(model)
-    shap_values = explainer(X_val)
 
+    # Use TreeExplainer for tree-based models and KernelExplainer for others
+    if hasattr(model, 'tree_') or isinstance(model, xgboost.XGBModel):
+        explainer = shap.TreeExplainer(model)
+    else:
+        explainer = shap.KernelExplainer(model.predict_proba, shap.kmeans(X_val, 10))
+
+    shap_values = explainer.shap_values(X_val)
+    
+    # For non-tree models, KernelExplainer returns a list for binary classification
+    if isinstance(shap_values, list):
+        shap_values = shap_values  # Use the SHAP values for the positive class
+    
     shap.summary_plot(shap_values, X_val, plot_type="bar", show=False)
     plt.savefig(output_image_path, bbox_inches='tight')
     plt.close()
