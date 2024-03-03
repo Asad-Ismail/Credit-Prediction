@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--val-data-ratio', type=float, default=0.1, help='Fraction of data to use for the val set.')
     parser.add_argument('--time-based-split', type=bool, default=True, help='Use Time based splitting for dataset')
     parser.add_argument('--apply-log', type=bool, default=True, help='Use Log transformation')
-    parser.add_argument('--apply-scaling', type=bool, default=False, help='Apply standard scaling')
+    parser.add_argument('--apply-scaling', type=bool, default=True, help='Apply standard scaling')
     parser.add_argument('--apply-imputer', type=bool, default=True, help='Impute values of missing values')
     parser.add_argument('--add-new-features', type=bool, default=False, help='Create new features')
     return parser.parse_args()
@@ -154,7 +154,7 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
         os.makedirs(output_dir)
     
     # Define the feature columns to transform
-    feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx', 'max_balance', 'min_balance']
+    feature_cols = ['total_nr_trx', 'nr_debit_trx', 'volume_debit_trx', 'nr_credit_trx', 'volume_credit_trx']
     
     # Plot original distributions
     plot_distributions(train_df, feature_cols+['CRG'], output_dir, "original_")
@@ -170,9 +170,9 @@ def preprocess_data(train_df: pd.DataFrame, val_df: pd.DataFrame, output_dir: st
     if args.apply_scaling:
         logging.info(f"Applying Scaling transformation!")
         # Apply standard scaling correctly across datasets
-        train_df, val_df= apply_standard_scaling(train_df, val_df, feature_cols)
+        train_df, val_df= apply_standard_scaling(train_df, val_df, feature_cols+['max_balance', 'min_balance'])
         # Plot distributions after standard scaling
-        plot_distributions(train_df, feature_cols, output_dir, "scaled_")
+        plot_distributions(train_df, feature_cols+['max_balance', 'min_balance'], output_dir, "scaled_")
     
     if args.apply_imputer:
         logging.info(f"Applying Imptations!")

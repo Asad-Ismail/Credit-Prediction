@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import xgboost
 from tqdm import tqdm 
+import numpy as np
 from sklearn.metrics import (recall_score, precision_score, roc_auc_score,
                              confusion_matrix, roc_curve, precision_recall_curve, auc,
                              average_precision_score)
@@ -14,8 +15,8 @@ from sklearn.metrics import (recall_score, precision_score, roc_auc_score,
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Model Inference.")
-    parser.add_argument('--model-name', type=str, default='logistic_regression', help='Name of trained model.')
-    parser.add_argument('--model-path', type=str, default='logistic_regression_hp_optimized.pkl', help='Path to the trained Model.')
+    parser.add_argument('--model-name', type=str, default='xgboost', help='Name of trained model.')
+    parser.add_argument('--model-path', type=str, default='xgboost_hp_optimized.pkl', help='Path to the trained Model.')
     parser.add_argument('--val-features', type=str, default='processed_data/val_features.csv', help='Path to the training features.')
     parser.add_argument('--val-labels', type=str, default='processed_data/val_labels.csv', help='Path to the training labels.')
     return parser.parse_args()
@@ -211,7 +212,7 @@ def explain_model_predictions(model: Any, X_val: pd.DataFrame, output_image_path
         shap_values_pos_class = shap_values
 
     # The default summary plot shows the impact direction on the model's output
-    shap.summary_plot(shap_values_pos_class, X_val, show=False)
+    shap.summary_plot(shap_values_pos_class, X_val,plot_type='bar', show=False)
     plt.savefig(output_image_path, bbox_inches='tight')
     plt.close()
 
@@ -230,7 +231,7 @@ if __name__ == "__main__":
     evaluate(y_val, pred, proba,args.model_name)
 
     ## Find Optimal threshold
-    optimal_threshold, min_cost = find_optimal_threshold(labels, predictions, cost_fn=500, cost_fp=100)
+    optimal_threshold, min_cost = find_optimal_threshold(y_val, pred, cost_fn=500, cost_fp=100)
     print(f"Optimal Threshold: {optimal_threshold}, Minimum Cost: {min_cost}")
     
     # Explain model predictions and save the plot as an image

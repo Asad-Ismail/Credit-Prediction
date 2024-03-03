@@ -29,10 +29,8 @@ def parse_args():
     parser.add_argument('--debug', type=bool, default=False, help='Debug the falsk app.')
     return parser.parse_args()
 
-# Parse command-line arguments
 args = parse_args()
 
-# Load the model when the application starts
 model = load_model(args.model_path)
 
 @app.route('/predict', methods=['POST'])
@@ -41,20 +39,13 @@ def predict():
     API endpoint for making predictions. Expects a POST request with a JSON payload
     containing the input features. Returns the predictions as JSON.
     """
-    # Parse the JSON payload
     data = request.get_json(force=True)
-    
-    # Validate that the JSON payload is in the correct format
     if not isinstance(data, dict) or 'features' not in data:
         return jsonify({'error': 'Invalid input format. Expecting a JSON object with a "features" key.'}), 400
-    
-    # Convert the features into a DataFrame
+
     features = pd.DataFrame([data['features']])
-    
-    # Make predictions
+
     predictions = model.predict(features)
-    
-    # Convert predictions to a list for JSON serialization
     predictions = predictions.tolist()
     
     # Return the predictions as a JSON object

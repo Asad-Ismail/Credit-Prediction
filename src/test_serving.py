@@ -57,7 +57,6 @@ if __name__ == "__main__":
     PREDICT_URL = 'http://localhost:5000/predict'  
     VAL_FEATURES_PATH = 'processed_data/val_features.csv'  
 
-    # Load validation features and create payloads
     val_features = load_validation_features(VAL_FEATURES_PATH)
     payloads = create_payloads(val_features)
 
