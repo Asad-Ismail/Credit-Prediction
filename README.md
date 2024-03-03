@@ -1,8 +1,8 @@
 # Credit-Prediction
 
-Prediction of weather a customer will apply for credit.
+Prediction of whether a customer will apply for credit.
 
-See Credit_Application.pptx for detail information
+See Credit_Application.pptx for detail information.
 
 ## Getting Started
 
@@ -13,7 +13,7 @@ git clone https://github.com/Asad-Ismail/Credit-Prediction
 cd Credit-Prediction
 ```
 
-## Install Requeirments 
+## Install Requirements 
 
 ```bash
 pip install -r requirements.txt
