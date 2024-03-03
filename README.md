@@ -1,6 +1,8 @@
 # Credit-Prediction
 
-Prediction of weather a customer will apply for credit
+Prediction of weather a customer will apply for credit.
+
+See Credit_Application.pptx for detail information
 
 ## Getting Started
 
